@@ -53,12 +53,12 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(100, 100, 50);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.left = -100;
-    directionalLight.shadow.camera.right = 100;
-    directionalLight.shadow.camera.top = 100;
-    directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.left = -50;
+    directionalLight.shadow.camera.right = 50;
+    directionalLight.shadow.camera.top = 50;
+    directionalLight.shadow.camera.bottom = -50;
     scene.add(directionalLight);
 
     const blocks: THREE.Mesh[] = [];
@@ -113,25 +113,25 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     const leavesMaterial = new THREE.MeshLambertMaterial({ map: leavesTexture, transparent: true, opacity: 0.8 });
 
     const generateTree = (x: number, z: number) => {
-      const trunkHeight = 5;
+      const trunkHeight = 4;
       for (let y = 0; y < trunkHeight; y++) {
         const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
         const trunk = new THREE.Mesh(geometry, woodMaterial);
         trunk.position.set(x, y, z);
-        trunk.castShadow = true;
-        trunk.receiveShadow = true;
+        trunk.castShadow = false;
+        trunk.receiveShadow = false;
         scene.add(trunk);
         blocks.push(trunk);
       }
 
-      for (let dy = 0; dy < 3; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          for (let dz = -2; dz <= 2; dz++) {
-            if (Math.random() > 0.3) {
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (Math.random() > 0.4) {
               const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
               const leaves = new THREE.Mesh(geometry, leavesMaterial);
               leaves.position.set(x + dx, trunkHeight + dy, z + dz);
-              leaves.castShadow = true;
+              leaves.castShadow = false;
               scene.add(leaves);
               blocks.push(leaves);
             }
@@ -172,8 +172,8 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
                 const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
                 const wall = new THREE.Mesh(geometry, woodMaterial);
                 wall.position.set(hx + dx, y, hz + dz);
-                wall.castShadow = true;
-                wall.receiveShadow = true;
+                wall.castShadow = false;
+                wall.receiveShadow = false;
                 scene.add(wall);
                 blocks.push(wall);
               }
@@ -195,12 +195,12 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
       else if (server === 'hypixel') { spawnX = 0; spawnZ = -50; }
     }
 
-    for (let x = -60; x < 60; x++) {
-      for (let z = -60; z < 60; z++) {
+    for (let x = -40; x < 40; x++) {
+      for (let z = -40; z < 40; z++) {
         const noise = Math.sin(x * 0.1) * Math.cos(z * 0.1);
         const height = Math.floor(noise * 3);
 
-        for (let y = -10; y <= height; y++) {
+        for (let y = -5; y <= height; y++) {
           let material: THREE.Material | THREE.Material[] = stoneMaterial;
           if (y === height) material = grassMaterials;
           else if (y === height - 1 || y === height - 2) material = dirtMaterial;
@@ -208,13 +208,13 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
           const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
           const block = new THREE.Mesh(geometry, material);
           block.position.set(x, y, z);
-          block.castShadow = true;
-          block.receiveShadow = true;
+          block.castShadow = y === height;
+          block.receiveShadow = false;
           scene.add(block);
           blocks.push(block);
         }
 
-        if (Math.random() > 0.97 && height >= 0) {
+        if (Math.random() > 0.985 && height >= 0) {
           generateTree(x, z);
         }
       }
@@ -229,8 +229,8 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
           const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
           const platform = new THREE.Mesh(geometry, stoneMaterial);
           platform.position.set(spawnX + dx, 0, spawnZ + dz);
-          platform.castShadow = true;
-          platform.receiveShadow = true;
+          platform.castShadow = false;
+          platform.receiveShadow = false;
           scene.add(platform);
           blocks.push(platform);
         }
@@ -360,14 +360,14 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
         const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         body.position.set(bot.position.x, bot.position.y, bot.position.z);
-        body.castShadow = true;
+        body.castShadow = false;
         scene.add(body);
 
         const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
         const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFA07A });
         const head = new THREE.Mesh(headGeometry, headMaterial);
         head.position.set(bot.position.x, bot.position.y + 1.3, bot.position.z);
-        head.castShadow = true;
+        head.castShadow = false;
         scene.add(head);
         botHeads.push(head);
 
