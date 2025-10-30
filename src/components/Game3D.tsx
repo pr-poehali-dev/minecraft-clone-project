@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import Inventory from './Inventory';
 import ChatBox from './ChatBox';
 import CheatMenu from './CheatMenu';
+import CraftingMenu from './CraftingMenu';
 
 interface Game3DProps {
   mode: 'singleplayer' | 'multiplayer';
@@ -23,25 +24,22 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
   const [showInventory, setShowInventory] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showCheat, setShowCheat] = useState(false);
-  const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 5, z: 0 });
+  const [showCrafting, setShowCrafting] = useState(false);
+  const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 20, z: 0 });
   const [bots, setBots] = useState<Bot[]>([]);
   const [breakingBlock, setBreakingBlock] = useState<THREE.Mesh | null>(null);
   const [breakProgress, setBreakProgress] = useState(0);
+  const [isPointerLocked, setIsPointerLocked] = useState(false);
 
   useEffect(() => {
     if (!mountRef.current) return;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.Fog(0x87CEEB, 0, 150);
+    scene.fog = new THREE.Fog(0x87CEEB, 0, 200);
 
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 5, 0);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 20, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -53,135 +51,240 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(50, 50, 50);
+    directionalLight.position.set(100, 100, 50);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
     scene.add(directionalLight);
 
     const blocks: THREE.Mesh[] = [];
-    const blockSize = 2;
+    const blockSize = 1;
 
-    const grassTexture = new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
-    const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
-    const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-    const stoneMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    const createTexture = (color: number) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+      ctx.fillRect(0, 0, 16, 16);
+      
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i < 16; i += 4) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 16);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(16, i);
+        ctx.stroke();
+      }
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      return texture;
+    };
 
-    for (let x = -20; x < 20; x++) {
-      for (let z = -20; z < 20; z++) {
-        const height = Math.floor(Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2);
-        
-        for (let y = -2; y <= height; y++) {
-          let material = stoneMaterial;
-          if (y === height) material = grassMaterial;
-          else if (y === height - 1) material = dirtMaterial;
+    const grassTop = createTexture(0x5C9A3D);
+    const grassSide = createTexture(0x7B6C47);
+    const dirtTexture = createTexture(0x8B6F47);
+    const stoneTexture = createTexture(0x7F7F7F);
+    const woodTexture = createTexture(0x8B6F47);
+    const leavesTexture = createTexture(0x2D5016);
+
+    const grassMaterials = [
+      new THREE.MeshLambertMaterial({ map: grassSide }),
+      new THREE.MeshLambertMaterial({ map: grassSide }),
+      new THREE.MeshLambertMaterial({ map: grassTop }),
+      new THREE.MeshLambertMaterial({ map: dirtTexture }),
+      new THREE.MeshLambertMaterial({ map: grassSide }),
+      new THREE.MeshLambertMaterial({ map: grassSide })
+    ];
+
+    const dirtMaterial = new THREE.MeshLambertMaterial({ map: dirtTexture });
+    const stoneMaterial = new THREE.MeshLambertMaterial({ map: stoneTexture });
+    const woodMaterial = new THREE.MeshLambertMaterial({ map: woodTexture });
+    const leavesMaterial = new THREE.MeshLambertMaterial({ map: leavesTexture, transparent: true, opacity: 0.8 });
+
+    const generateTree = (x: number, z: number) => {
+      const trunkHeight = 5;
+      for (let y = 0; y < trunkHeight; y++) {
+        const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+        const trunk = new THREE.Mesh(geometry, woodMaterial);
+        trunk.position.set(x, y, z);
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        scene.add(trunk);
+        blocks.push(trunk);
+      }
+
+      for (let dy = 0; dy < 3; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          for (let dz = -2; dz <= 2; dz++) {
+            if (Math.random() > 0.3) {
+              const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+              const leaves = new THREE.Mesh(geometry, leavesMaterial);
+              leaves.position.set(x + dx, trunkHeight + dy, z + dz);
+              leaves.castShadow = true;
+              scene.add(leaves);
+              blocks.push(leaves);
+            }
+          }
+        }
+      }
+    };
+
+    const generateCave = (cx: number, cz: number) => {
+      const caveRadius = 5;
+      const caveDepth = -5;
+      
+      for (let y = caveDepth; y < 0; y++) {
+        for (let dx = -caveRadius; dx <= caveRadius; dx++) {
+          for (let dz = -caveRadius; dz <= caveRadius; dz++) {
+            if (dx * dx + dz * dz < caveRadius * caveRadius) {
+              const existingBlock = blocks.find(b => 
+                Math.abs(b.position.x - (cx + dx)) < 0.5 &&
+                Math.abs(b.position.y - y) < 0.5 &&
+                Math.abs(b.position.z - (cz + dz)) < 0.5
+              );
+              if (existingBlock) {
+                scene.remove(existingBlock);
+                blocks.splice(blocks.indexOf(existingBlock), 1);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const generateVillage = (vx: number, vz: number) => {
+      const buildHouse = (hx: number, hz: number) => {
+        for (let y = 0; y < 4; y++) {
+          for (let dx = 0; dx < 5; dx++) {
+            for (let dz = 0; dz < 5; dz++) {
+              if (y === 0 || dx === 0 || dx === 4 || dz === 0 || dz === 4) {
+                const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+                const wall = new THREE.Mesh(geometry, woodMaterial);
+                wall.position.set(hx + dx, y, hz + dz);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                blocks.push(wall);
+              }
+            }
+          }
+        }
+      };
+
+      buildHouse(vx, vz);
+      buildHouse(vx + 8, vz);
+      buildHouse(vx, vz + 8);
+      buildHouse(vx + 8, vz + 8);
+    };
+
+    let spawnX = 0, spawnZ = 0;
+    if (mode === 'multiplayer' && server) {
+      if (server === 'holyworld') { spawnX = 50; spawnZ = 50; }
+      else if (server === 'funtime') { spawnX = -50; spawnZ = 50; }
+      else if (server === 'hypixel') { spawnX = 0; spawnZ = -50; }
+    }
+
+    for (let x = -60; x < 60; x++) {
+      for (let z = -60; z < 60; z++) {
+        const noise = Math.sin(x * 0.1) * Math.cos(z * 0.1);
+        const height = Math.floor(noise * 3);
+
+        for (let y = -10; y <= height; y++) {
+          let material: THREE.Material | THREE.Material[] = stoneMaterial;
+          if (y === height) material = grassMaterials;
+          else if (y === height - 1 || y === height - 2) material = dirtMaterial;
 
           const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
           const block = new THREE.Mesh(geometry, material);
-          block.position.set(x * blockSize, y * blockSize, z * blockSize);
+          block.position.set(x, y, z);
           block.castShadow = true;
           block.receiveShadow = true;
           scene.add(block);
           blocks.push(block);
         }
+
+        if (Math.random() > 0.97 && height >= 0) {
+          generateTree(x, z);
+        }
       }
     }
 
+    if (mode === 'multiplayer' && server) {
+      generateVillage(spawnX, spawnZ);
+      
+      const spawnPlatformSize = 10;
+      for (let dx = -spawnPlatformSize; dx < spawnPlatformSize; dx++) {
+        for (let dz = -spawnPlatformSize; dz < spawnPlatformSize; dz++) {
+          const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+          const platform = new THREE.Mesh(geometry, stoneMaterial);
+          platform.position.set(spawnX + dx, 0, spawnZ + dz);
+          platform.castShadow = true;
+          platform.receiveShadow = true;
+          scene.add(platform);
+          blocks.push(platform);
+        }
+      }
+
+      camera.position.set(spawnX, 20, spawnZ);
+    }
+
+    generateCave(30, 30);
+    generateCave(-40, -20);
+
     const velocity = { x: 0, y: 0, z: 0 };
-    const speed = 0.3;
-    const gravity = -0.02;
+    const speed = 0.15;
+    const gravity = -0.015;
     const keys: { [key: string]: boolean } = {};
     let isGrounded = false;
 
-    const particleGeometry = new THREE.BufferGeometry();
-    const particleCount = 100;
-    const particlePositions = new Float32Array(particleCount * 3);
-    const particleColors = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = (Math.random() - 0.5) * 100;
-      particlePositions[i + 1] = Math.random() * 50;
-      particlePositions[i + 2] = (Math.random() - 0.5) * 100;
-      particleColors[i] = 1;
-      particleColors[i + 1] = 1;
-      particleColors[i + 2] = 1;
-    }
-
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
-
-    const particleMaterial = new THREE.PointsMaterial({
-      size: 0.1,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.6
-    });
-
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    scene.add(particles);
-
-    if (mode === 'multiplayer') {
-      const initialBots: Bot[] = [
-        { id: 1, name: 'Player_123', position: { x: 10, y: 0, z: 10 }, health: 100 },
-        { id: 2, name: 'NoobMaster', position: { x: -15, y: 0, z: 5 }, health: 100 },
-        { id: 3, name: 'ProGamer777', position: { x: 5, y: 0, z: -20 }, health: 100 }
-      ];
-
-      initialBots.forEach(bot => {
-        const bodyGeometry = new THREE.BoxGeometry(1, 2, 0.5);
-        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        body.position.set(bot.position.x, bot.position.y + 1, bot.position.z);
-        body.castShadow = true;
-        scene.add(body);
-
-        const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-        const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFA07A });
-        const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.set(bot.position.x, bot.position.y + 2.4, bot.position.z);
-        head.castShadow = true;
-        scene.add(head);
-
-        bot.mesh = body;
-      });
-
-      setBots(initialBots);
-    }
-
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let targetBlock: THREE.Mesh | null = null;
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const PI_2 = Math.PI / 2;
 
     const onMouseMove = (event: MouseEvent) => {
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      if (!isPointerLocked) return;
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(blocks);
+      const movementX = event.movementX || 0;
+      const movementY = event.movementY || 0;
 
-      if (intersects.length > 0) {
-        const block = intersects[0].object as THREE.Mesh;
-        if (targetBlock !== block) {
-          if (targetBlock && targetBlock.material instanceof THREE.MeshLambertMaterial) {
-            targetBlock.material.emissive.setHex(0x000000);
-          }
-          targetBlock = block;
-          if (targetBlock.material instanceof THREE.MeshLambertMaterial) {
-            targetBlock.material.emissive.setHex(0x333333);
-          }
-        }
-      } else {
-        if (targetBlock && targetBlock.material instanceof THREE.MeshLambertMaterial) {
-          targetBlock.material.emissive.setHex(0x000000);
-        }
-        targetBlock = null;
-      }
+      euler.setFromQuaternion(camera.quaternion);
+      euler.y -= movementX * 0.002;
+      euler.x -= movementY * 0.002;
+      euler.x = Math.max(-PI_2, Math.min(PI_2, euler.x));
+      camera.quaternion.setFromEuler(euler);
     };
 
+    const raycaster = new THREE.Raycaster();
+    raycaster.far = 10;
+    const targetBlock: THREE.Mesh | null = null;
+
     const onMouseDown = (event: MouseEvent) => {
-      if (event.button === 0 && targetBlock) {
-        setBreakingBlock(targetBlock);
-        setBreakProgress(0);
+      if (!isPointerLocked) {
+        renderer.domElement.requestPointerLock();
+        return;
+      }
+
+      if (event.button === 0) {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        raycaster.set(camera.position, direction);
+        const intersects = raycaster.intersectObjects(blocks);
+
+        if (intersects.length > 0) {
+          const block = intersects[0].object as THREE.Mesh;
+          setBreakingBlock(block);
+          setBreakProgress(0);
+        }
       }
     };
 
@@ -193,31 +296,30 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       keys[e.key.toLowerCase()] = true;
 
-      if ((e.key === 'e' || e.key === 'у' || e.key === 'E' || e.key === 'У') && !showInventory) {
-        e.preventDefault();
+      if ((e.key === 'e' || e.key === 'у' || e.key === 'E' || e.key === 'У') && isPointerLocked) {
         setShowInventory(true);
-        setShowChat(false);
-        setShowCheat(false);
+        document.exitPointerLock();
       }
-      if ((e.key === 't' || e.key === 'е' || e.key === 'T' || e.key === 'Е') && !showChat) {
-        e.preventDefault();
+      if ((e.key === 't' || e.key === 'е' || e.key === 'T' || e.key === 'Е') && isPointerLocked) {
         setShowChat(true);
-        setShowInventory(false);
-        setShowCheat(false);
+        document.exitPointerLock();
       }
-      if ((e.key === 'n' || e.key === 'т' || e.key === 'N' || e.key === 'Т') && !showCheat) {
-        e.preventDefault();
+      if ((e.key === 'n' || e.key === 'т' || e.key === 'N' || e.key === 'Т') && isPointerLocked) {
         setShowCheat(true);
-        setShowInventory(false);
-        setShowChat(false);
+        document.exitPointerLock();
       }
-      if (e.key === 'Escape') {
+      if ((e.key === 'c' || e.key === 'с' || e.key === 'C' || e.key === 'С') && isPointerLocked) {
+        setShowCrafting(true);
+        document.exitPointerLock();
+      }
+      if (e.key === 'Escape' && !isPointerLocked) {
         setShowInventory(false);
         setShowChat(false);
         setShowCheat(false);
+        setShowCrafting(false);
       }
       if (e.key === ' ' && isGrounded) {
-        velocity.y = 0.5;
+        velocity.y = 0.3;
         isGrounded = false;
       }
     };
@@ -226,31 +328,82 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
       keys[e.key.toLowerCase()] = false;
     };
 
+    const onPointerLockChange = () => {
+      setIsPointerLocked(document.pointerLockElement === renderer.domElement);
+    };
+
+    document.addEventListener('pointerlockchange', onPointerLockChange);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
 
+    if (mode === 'multiplayer') {
+      const initialBots: Bot[] = [
+        { id: 1, name: 'Player_123', position: { x: spawnX + 5, y: 2, z: spawnZ + 5 }, health: 100 },
+        { id: 2, name: 'NoobMaster', position: { x: spawnX - 5, y: 2, z: spawnZ }, health: 100 },
+        { id: 3, name: 'ProGamer777', position: { x: spawnX, y: 2, z: spawnZ - 5 }, health: 100 }
+      ];
+
+      initialBots.forEach(bot => {
+        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.3);
+        const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.set(bot.position.x, bot.position.y, bot.position.z);
+        body.castShadow = true;
+        scene.add(body);
+
+        const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFA07A });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.set(bot.position.x, bot.position.y + 0.85, bot.position.z);
+        head.castShadow = true;
+        scene.add(head);
+
+        bot.mesh = body;
+      });
+
+      setBots(initialBots);
+    }
+
     const animate = () => {
       requestAnimationFrame(animate);
 
-      if (keys['w'] || keys['ц']) velocity.z = speed;
-      else if (keys['s'] || keys['ы']) velocity.z = -speed;
-      else velocity.z = 0;
+      const direction = new THREE.Vector3();
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
 
-      if (keys['a'] || keys['ф']) velocity.x = speed;
-      else if (keys['d'] || keys['в']) velocity.x = -speed;
-      else velocity.x = 0;
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+
+      right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+
+      direction.set(0, 0, 0);
+
+      if (keys['w'] || keys['ц']) direction.add(forward);
+      if (keys['s'] || keys['ы']) direction.sub(forward);
+      if (keys['a'] || keys['ф']) direction.sub(right);
+      if (keys['d'] || keys['в']) direction.add(right);
+
+      if (direction.length() > 0) {
+        direction.normalize();
+        velocity.x = direction.x * speed;
+        velocity.z = direction.z * speed;
+      } else {
+        velocity.x = 0;
+        velocity.z = 0;
+      }
 
       velocity.y += gravity;
 
-      camera.position.x -= velocity.x;
-      camera.position.z -= velocity.z;
+      camera.position.x += velocity.x;
+      camera.position.z += velocity.z;
       camera.position.y += velocity.y;
 
-      if (camera.position.y < 2) {
-        camera.position.y = 2;
+      if (camera.position.y < 1.7) {
+        camera.position.y = 1.7;
         velocity.y = 0;
         isGrounded = true;
       }
@@ -260,19 +413,6 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
         y: camera.position.y,
         z: camera.position.z
       });
-
-      if (velocity.x !== 0 || velocity.z !== 0) {
-        const positions = particleGeometry.attributes.position.array as Float32Array;
-        for (let i = 1; i < particleCount * 3; i += 3) {
-          positions[i] -= 0.1;
-          if (positions[i] < 0) {
-            positions[i] = 10;
-            positions[i - 1] = camera.position.x + (Math.random() - 0.5) * 2;
-            positions[i + 1] = camera.position.z + (Math.random() - 0.5) * 2;
-          }
-        }
-        particleGeometry.attributes.position.needsUpdate = true;
-      }
 
       renderer.render(scene, camera);
     };
@@ -287,13 +427,16 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     window.addEventListener('resize', handleResize);
 
     return () => {
+      document.removeEventListener('pointerlockchange', onPointerLockChange);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('resize', handleResize);
-      mountRef.current?.removeChild(renderer.domElement);
+      if (mountRef.current && renderer.domElement.parentNode === mountRef.current) {
+        mountRef.current.removeChild(renderer.domElement);
+      }
       renderer.dispose();
     };
   }, [mode, server]);
@@ -320,6 +463,10 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
 
   const displayServer = mode === 'multiplayer' ? server?.toUpperCase() : 'ОДИНОЧНАЯ ИГРА';
 
+  const handleCraft = (item: string) => {
+    console.log('Crafted:', item);
+  };
+
   return (
     <div className="relative w-full h-screen overflow-hidden">
       <div ref={mountRef} className="absolute inset-0" />
@@ -335,7 +482,8 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
           </div>
         )}
         <div className="text-gray-400 text-xs mt-3 border-t border-gray-600 pt-2">
-          WASD - движение | SPACE - прыжок | ЛКМ - ломать<br/>E - инвентарь | T - чат | N - читы
+          {!isPointerLocked ? 'Кликни чтобы начать' : 'WASD - движение | SPACE - прыжок | ЛКМ - ломать'}
+          <br/>E - инвентарь | T - чат | N - читы | C - крафтинг
         </div>
       </div>
 
@@ -348,16 +496,19 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
         </button>
       </div>
 
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
-        <div className="relative">
-          <div className="w-8 h-8 border-2 border-white shadow-lg shadow-white/50"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
+      {isPointerLocked && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
+          <div className="relative">
+            <div className="w-8 h-8 border-2 border-white shadow-lg shadow-white/50"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
+          </div>
         </div>
-      </div>
+      )}
 
       {showInventory && <Inventory onClose={() => setShowInventory(false)} />}
       {showChat && <ChatBox bots={bots} onClose={() => setShowChat(false)} />}
       {showCheat && <CheatMenu onClose={() => setShowCheat(false)} />}
+      {showCrafting && <CraftingMenu onClose={() => setShowCrafting(false)} onCraft={handleCraft} />}
     </div>
   );
 };
