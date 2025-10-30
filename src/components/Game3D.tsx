@@ -39,7 +39,7 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     scene.fog = new THREE.Fog(0x87CEEB, 0, 200);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 20, 0);
+    camera.position.set(0, 25, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -236,7 +236,7 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
         }
       }
 
-      camera.position.set(spawnX, 20, spawnZ);
+      camera.position.set(spawnX, 25, spawnZ);
     }
 
     generateCave(30, 30);
@@ -341,25 +341,33 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
 
     if (mode === 'multiplayer') {
       const initialBots: Bot[] = [
-        { id: 1, name: 'Player_123', position: { x: spawnX + 5, y: 2, z: spawnZ + 5 }, health: 100 },
-        { id: 2, name: 'NoobMaster', position: { x: spawnX - 5, y: 2, z: spawnZ }, health: 100 },
-        { id: 3, name: 'ProGamer777', position: { x: spawnX, y: 2, z: spawnZ - 5 }, health: 100 }
+        { id: 1, name: 'Player_123', position: { x: spawnX + 5, y: 5, z: spawnZ + 5 }, health: 100 },
+        { id: 2, name: 'NoobMaster', position: { x: spawnX - 5, y: 5, z: spawnZ }, health: 100 },
+        { id: 3, name: 'ProGamer777', position: { x: spawnX, y: 5, z: spawnZ - 5 }, health: 100 }
       ];
 
+      const botTargets = initialBots.map(bot => ({
+        targetX: bot.position.x + (Math.random() - 0.5) * 20,
+        targetZ: bot.position.z + (Math.random() - 0.5) * 20
+      }));
+
+      const botHeads: THREE.Mesh[] = [];
+
       initialBots.forEach(bot => {
-        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.3);
+        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.8, 0.3);
         const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         body.position.set(bot.position.x, bot.position.y, bot.position.z);
         body.castShadow = true;
         scene.add(body);
 
-        const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const headGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
         const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFA07A });
         const head = new THREE.Mesh(headGeometry, headMaterial);
-        head.position.set(bot.position.x, bot.position.y + 0.85, bot.position.z);
+        head.position.set(bot.position.x, bot.position.y + 1.3, bot.position.z);
         head.castShadow = true;
         scene.add(head);
+        botHeads.push(head);
 
         bot.mesh = body;
       });
@@ -402,10 +410,38 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
       camera.position.z += velocity.z;
       camera.position.y += velocity.y;
 
-      if (camera.position.y < 1.7) {
-        camera.position.y = 1.7;
+      if (camera.position.y < 3) {
+        camera.position.y = 3;
         velocity.y = 0;
         isGrounded = true;
+      }
+
+      if (mode === 'multiplayer') {
+        initialBots.forEach((bot, index) => {
+          if (!bot.mesh) return;
+
+          const target = botTargets[index];
+          const dx = target.targetX - bot.position.x;
+          const dz = target.targetZ - bot.position.z;
+          const distance = Math.sqrt(dx * dx + dz * dz);
+
+          if (distance > 0.5) {
+            const moveSpeed = 0.05;
+            bot.position.x += (dx / distance) * moveSpeed;
+            bot.position.z += (dz / distance) * moveSpeed;
+
+            bot.mesh.position.x = bot.position.x;
+            bot.mesh.position.z = bot.position.z;
+
+            if (botHeads[index]) {
+              botHeads[index].position.x = bot.position.x;
+              botHeads[index].position.z = bot.position.z;
+            }
+          } else {
+            target.targetX = bot.position.x + (Math.random() - 0.5) * 20;
+            target.targetZ = bot.position.z + (Math.random() - 0.5) * 20;
+          }
+        });
       }
 
       setPlayerPosition({
@@ -464,7 +500,7 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
   const displayServer = mode === 'multiplayer' ? server?.toUpperCase() : 'ОДИНОЧНАЯ ИГРА';
 
   const handleCraft = (item: string) => {
-    console.log('Crafted:', item);
+    item;
   };
 
   return (
