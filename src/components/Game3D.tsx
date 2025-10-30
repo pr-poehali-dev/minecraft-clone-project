@@ -339,19 +339,21 @@ const Game3D = ({ mode, server, onBackToMenu }: Game3DProps) => {
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
 
+    let initialBots: Bot[] = [];
+    let botTargets: { targetX: number; targetZ: number }[] = [];
+    const botHeads: THREE.Mesh[] = [];
+
     if (mode === 'multiplayer') {
-      const initialBots: Bot[] = [
+      initialBots = [
         { id: 1, name: 'Player_123', position: { x: spawnX + 5, y: 5, z: spawnZ + 5 }, health: 100 },
         { id: 2, name: 'NoobMaster', position: { x: spawnX - 5, y: 5, z: spawnZ }, health: 100 },
         { id: 3, name: 'ProGamer777', position: { x: spawnX, y: 5, z: spawnZ - 5 }, health: 100 }
       ];
 
-      const botTargets = initialBots.map(bot => ({
+      botTargets = initialBots.map(bot => ({
         targetX: bot.position.x + (Math.random() - 0.5) * 20,
         targetZ: bot.position.z + (Math.random() - 0.5) * 20
       }));
-
-      const botHeads: THREE.Mesh[] = [];
 
       initialBots.forEach(bot => {
         const bodyGeometry = new THREE.BoxGeometry(0.6, 1.8, 0.3);
