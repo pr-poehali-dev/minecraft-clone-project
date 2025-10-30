@@ -1,12 +1,31 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import MainMenu from '@/components/MainMenu';
+import GameWorld from '@/components/GameWorld';
+
+type GameState = 'menu' | 'playing';
+type Server = 'holyworld' | 'funtime' | 'hypixel';
 
 const Index = () => {
+  const [gameState, setGameState] = useState<GameState>('menu');
+  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+
+  const handleServerSelect = (server: Server) => {
+    setSelectedServer(server);
+    setGameState('playing');
+  };
+
+  const handleBackToMenu = () => {
+    setGameState('menu');
+    setSelectedServer(null);
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 color-black text-black">Добро пожаловать!</h1>
-        <p className="text-xl text-gray-600">тут будет отображаться ваш проект</p>
-      </div>
+    <div className="w-full h-screen overflow-hidden bg-black">
+      {gameState === 'menu' ? (
+        <MainMenu onServerSelect={handleServerSelect} />
+      ) : (
+        <GameWorld server={selectedServer!} onBackToMenu={handleBackToMenu} />
+      )}
     </div>
   );
 };

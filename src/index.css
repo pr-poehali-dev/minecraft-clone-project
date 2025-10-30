@@ -99,3 +99,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+
+.pixel-text {
+  font-family: "Courier New", monospace;
+  font-weight: bold;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+  image-rendering: pixelated;
+}
