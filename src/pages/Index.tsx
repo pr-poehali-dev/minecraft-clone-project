@@ -1,13 +1,25 @@
 import { useState } from 'react';
+import ModeSelection from '@/components/ModeSelection';
 import MainMenu from '@/components/MainMenu';
-import GameWorld from '@/components/GameWorld';
+import Game3D from '@/components/Game3D';
 
-type GameState = 'menu' | 'playing';
+type GameState = 'mode-select' | 'server-select' | 'playing';
 type Server = 'holyworld' | 'funtime' | 'hypixel';
+type GameMode = 'singleplayer' | 'multiplayer';
 
 const Index = () => {
-  const [gameState, setGameState] = useState<GameState>('menu');
+  const [gameState, setGameState] = useState<GameState>('mode-select');
+  const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+
+  const handleModeSelect = (mode: GameMode) => {
+    setGameMode(mode);
+    if (mode === 'singleplayer') {
+      setGameState('playing');
+    } else {
+      setGameState('server-select');
+    }
+  };
 
   const handleServerSelect = (server: Server) => {
     setSelectedServer(server);
@@ -15,16 +27,25 @@ const Index = () => {
   };
 
   const handleBackToMenu = () => {
-    setGameState('menu');
+    setGameState('mode-select');
+    setGameMode(null);
     setSelectedServer(null);
   };
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black">
-      {gameState === 'menu' ? (
+      {gameState === 'mode-select' && (
+        <ModeSelection onModeSelect={handleModeSelect} />
+      )}
+      {gameState === 'server-select' && (
         <MainMenu onServerSelect={handleServerSelect} />
-      ) : (
-        <GameWorld server={selectedServer!} onBackToMenu={handleBackToMenu} />
+      )}
+      {gameState === 'playing' && (
+        <Game3D 
+          mode={gameMode!} 
+          server={selectedServer || undefined} 
+          onBackToMenu={handleBackToMenu} 
+        />
       )}
     </div>
   );
